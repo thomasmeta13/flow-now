@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { auth, createUserDocument } from '../firebase';
+import { auth, createUserDocument, resetPassword } from '../firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 
 interface LoginProps {
@@ -14,6 +14,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [reason, setReason] = useState<string[]>([]);
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState('');
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   const reasons = ["Exam preparation", "Focus improvement", "Reading Disorder"];
 
@@ -41,6 +42,25 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     } catch (error: any) {
       console.error('Authentication error:', error);
       setError(`Failed to ${isSignUp ? 'sign up' : 'log in'}. ${error.message}`);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setResetEmailSent(false);
+
+    if (!email) {
+      setError('Please enter your email address.');
+      return;
+    }
+
+    try {
+      await resetPassword(email);
+      setResetEmailSent(true);
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      setError(`Failed to send password reset email. ${error.message}`);
     }
   };
 
@@ -123,6 +143,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </button>
           </div>
         </form>
+        
+        {!isSignUp && (
+          <div className="mt-4">
+            <button
+              onClick={handleForgotPassword}
+              className="text-sm text-indigo-600 hover:text-indigo-500"
+            >
+              Forgot Password?
+            </button>
+          </div>
+        )}
+        
         <div className="mt-4 text-center">
           <button
             type="button"
@@ -132,10 +164,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             {isSignUp ? 'Already have an account? Log In' : 'Need an account? Sign Up'}
           </button>
         </div>
+        
         {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+        {resetEmailSent && (
+          <p className="mt-4 text-sm text-green-600">
+            Password reset email sent. Please check your inbox.
+          </p>
+        )}
       </div>
     </div>
   );
 };
 
 export default Login;
+

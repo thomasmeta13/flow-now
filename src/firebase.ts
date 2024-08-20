@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, User } from 'firebase/auth';
+import { getAuth, User, sendPasswordResetEmail } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, increment, DocumentData } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -58,6 +58,15 @@ export const getUserData = async (userId: string): Promise<DocumentData | undefi
     };
   }
   return undefined;
+};
+
+export const resetPassword = async (email: string): Promise<void> => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error) {
+    console.error("Error sending password reset email", error);
+    throw error;
+  }
 };
 
 export const updateUserProgress = async (userId: string, updates: { 

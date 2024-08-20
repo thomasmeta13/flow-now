@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Confetti from 'react-confetti';
 import { useNavigate } from 'react-router-dom';
 import { auth, updateUserProgress, getUserData } from '../firebase';
+import ChatbotModal from './ChatbotModal';
 
 interface WordBreathingExerciseProps {
   onComplete: () => void;
@@ -22,6 +23,7 @@ const WordBreathingExercise: React.FC<WordBreathingExerciseProps> = ({ openChatM
   const [currentWord, setCurrentWord] = useState('');
   const [xp, setXp] = useState(0);
   const [level, setLevel] = useState(1);
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 
   const [inhaleTime, setInhaleTime] = useState(0);
   const [exhaleTime, setExhaleTime] = useState(0);
@@ -51,7 +53,9 @@ const WordBreathingExercise: React.FC<WordBreathingExerciseProps> = ({ openChatM
             duration: duration,
             inhaleTime: Math.round(inhaleTime * 10) / 10,
             exhaleTime: Math.round(exhaleTime * 10) / 10,
-            feeling: feeling
+            feeling: feeling,
+            progress: 100,
+            wordsRead: cycleCount
           };
           const updates = {
             xp: newXp,
@@ -80,6 +84,20 @@ const WordBreathingExercise: React.FC<WordBreathingExerciseProps> = ({ openChatM
     setStage('completed');
     setShowConfetti(true);
   };
+
+  useEffect(() => {
+    let confettiTimer: NodeJS.Timeout;
+    if (showConfetti) {
+      confettiTimer = setTimeout(() => {
+        setShowConfetti(false);
+      }, 2500); // 1.5 seconds
+    }
+    return () => {
+      if (confettiTimer) {
+        clearTimeout(confettiTimer);
+      }
+    };
+  }, [showConfetti]);
 
   const handleReturnHome = () => {
     navigate('/');
@@ -147,36 +165,37 @@ const WordBreathingExercise: React.FC<WordBreathingExerciseProps> = ({ openChatM
     }
   }, [stage]);
 
-  const storeExerciseData = useCallback(async () => {
-    const user = auth.currentUser;
-    if (user) {
-      try {
-        const userData = await getUserData(user.uid);
-        if (userData) {
-          const sessionData = {
-            timestamp: new Date().toISOString(),
-            duration: duration,
-            inhaleTime: Math.round(inhaleTime * 10) / 10,
-            exhaleTime: Math.round(exhaleTime * 10) / 10,
-            progress: Math.floor(progress)
-          };
-          const updates = {
-            exerciseData: {
-              ...userData.exerciseData,
-              wordBreathing: userData.exerciseData?.wordBreathing
-                ? [...userData.exerciseData.wordBreathing, sessionData]
-                : [sessionData]
-            }
-          };
-          
-          await updateUserProgress(user.uid, updates);
-        }
-      } catch (error) {
-        console.error('Error storing exercise data:', error);
+const storeExerciseData = useCallback(async () => {
+  const user = auth.currentUser;
+  if (user) {
+    try {
+      const userData = await getUserData(user.uid);
+      if (userData) {
+        const sessionData = {
+          timestamp: new Date().toISOString(),
+          duration: duration,
+          inhaleTime: Math.round(inhaleTime * 10) / 10,
+          exhaleTime: Math.round(exhaleTime * 10) / 10,
+          progress: Math.floor(progress),
+          wordsRead: cycleCount
+        };
+        const updates = {
+          exerciseData: {
+            ...userData.exerciseData,
+            wordBreathing: userData.exerciseData?.wordBreathing
+              ? [...userData.exerciseData.wordBreathing, sessionData]
+              : [sessionData]
+          }
+        };
+        
+        await updateUserProgress(user.uid, updates);
       }
+    } catch (error) {
+      console.error('Error storing exercise data:', error);
     }
-  }, [duration, inhaleTime, exhaleTime, progress]);
-  
+  }
+}, [duration, inhaleTime, exhaleTime, progress, cycleCount]);
+
   // Add this effect to call storeExerciseData every 30 seconds
   useEffect(() => {
     if (stage === 'exercise') {
@@ -200,6 +219,12 @@ const WordBreathingExercise: React.FC<WordBreathingExerciseProps> = ({ openChatM
     stopBreathingTimer();
   };
 
+  const handleChatModalClose = () => {
+    setIsChatModalOpen(false);
+    handleExerciseComplete();
+  };
+
+
   const handleDurationSelect = (selectedDuration: number) => {
     setDuration(selectedDuration);
     setStage('exercise');
@@ -208,11 +233,12 @@ const WordBreathingExercise: React.FC<WordBreathingExerciseProps> = ({ openChatM
   const handleFeelingClick = (selectedFeeling: string) => {
     setFeeling(selectedFeeling);
     if (selectedFeeling === 'I Want to Ask a Question') {
-      openChatModal();
+      setIsChatModalOpen(true);
     } else {
       handleExerciseComplete();
     }
   };
+
 
   const startBreathingTimer = (action: 'inhale' | 'exhale') => {
     startTimeRef.current = Date.now();
@@ -242,45 +268,68 @@ const WordBreathingExercise: React.FC<WordBreathingExerciseProps> = ({ openChatM
   return (
     <div className="h-screen bg-gray-900 text-white flex flex-col items-center justify-center relative">
       <AnimatePresence>
-        {stage === 'intro' && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="text-center max-w-2xl mx-auto"
-          >
-            <h2 className="text-3xl font-bold mb-6 text-blue-400">Word Breathing Exercise</h2>
-            <div className="mb-6 bg-gray-800 p-6 rounded-lg">
-              <h3 className="text-2xl font-bold mb-3 text-blue-300">Goal</h3>
-              <ul className="list-disc list-inside text-gray-300">
-                <li>Become familiar with and control your breathing rhythm while reading</li>
-                <li>Cut off subvocalization and calm the mind</li>
-              </ul>
-            </div>
-            <div className="mb-6 bg-gray-800 p-6 rounded-lg">
-              <h3 className="text-2xl font-bold mb-3 text-blue-300">Instructions</h3>
-              <ul className="list-disc list-inside text-gray-300">
-                <li>A single word will appear every 5 seconds</li>
-                <li>Inhale for 5 seconds, hold for 1 second, then exhale for 5 seconds</li>
-                <li>Click "Hold when Inhaling" when you finish inhaling</li>
-                <li>Click "Hold when Exhaling" when you finish exhaling</li>
-                <li>Follow the expanding and shrinking circle for timing</li>
-              </ul>
-            </div>
-            <div className="mt-6 space-x-4">
-              <button onClick={() => handleDurationSelect(1)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-                Beginner (1 minute)
-              </button>
-              <button onClick={() => handleDurationSelect(3)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-                Intermediate (3 minutes)
-              </button>
-              <button onClick={() => handleDurationSelect(5)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-                Pro (5 minutes)
-              </button>
-            </div>
-          </motion.div>
-        )}
+{stage === 'intro' && (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="bg-gray-800 text-white p-8 rounded-lg shadow-lg max-w-2xl w-full mx-auto relative"
+  >
+    <button 
+      onClick={() => navigate('/')} 
+      className="absolute top-4 right-4 text-gray-400 hover:text-white"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
 
+    <h2 className="text-3xl font-bold mb-6 text-center text-blue-400">Word Breathing Exercise</h2>
+
+    <div className="mb-6 aspect-w-16 aspect-h-9">
+      <video 
+        className="w-full h-full object-cover rounded-lg"
+        src="/exercise1.mp4"
+        controls
+      >
+        Your browser does not support the video tag.
+      </video>
+    </div>
+
+    <div className="text-left mb-6">
+      <h3 className="text-2xl font-bold mb-3 text-blue-300">Goal</h3>
+      <ul className="list-disc list-inside text-gray-300 ml-4">
+        <li>Become familiar with and control your breathing rhythm while reading</li>
+        <li>Cut off subvocalization and calm the mind</li>
+      </ul>
+    </div>
+
+    <div className="text-left mb-6">
+      <h3 className="text-2xl font-bold mb-3 text-blue-300">Instructions</h3>
+      <ul className="list-disc list-inside text-gray-300 ml-4">
+        <li>A single word will appear every 5 seconds</li>
+        <li>Inhale for 5 seconds, hold for 1 second, then exhale for 5 seconds</li>
+        <li>Press the center circle while inhaling</li>
+        <li>Release while holding your breath</li>
+        <li>Press the center circle while exhaling</li>
+      </ul>
+    </div>
+
+    <div className="text-left mb-6">
+      <h3 className="text-2xl font-bold mb-3 text-blue-300">Completion Criteria</h3>
+      <ul className="list-disc list-inside text-gray-300 ml-4">
+        <li>Repeatedly do the exercise to 100% completion</li>
+      </ul>
+    </div>
+
+    <button
+      onClick={() => handleDurationSelect(1)}
+      className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded transition duration-300 ease-in-out"
+    >
+      Start!
+    </button>
+  </motion.div>
+)}
         {stage === 'exercise' && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -372,6 +421,7 @@ const WordBreathingExercise: React.FC<WordBreathingExerciseProps> = ({ openChatM
           </motion.div>
         )}
 
+
         {stage === 'completed' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -407,6 +457,8 @@ const WordBreathingExercise: React.FC<WordBreathingExerciseProps> = ({ openChatM
         </motion.div>
         )}
       </AnimatePresence>
+      <ChatbotModal isOpen={isChatModalOpen} onClose={handleChatModalClose} />
+
       {showConfetti && <Confetti />}
     </div>
   );

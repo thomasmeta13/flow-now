@@ -19,14 +19,18 @@ import PracticeReadingExercise from './components/Exercise10';
 export interface UserData {
   username: string;
   email: string;
-  xp: number;
+  bio: string;
+  reason: string[];
   level: number;
+  xp: number;
+  xpRequiredForNextLevel: number;
+  completedExercises: Record<string, boolean>;
+  achievements: string[];
   streak: number;
-  lastLoginDate: string;
-  completedExercises: Record<string, boolean>; // Make this optional
   currentDailyExercise: number;
-  lastCompletionDate: string; // ISO date string  
   isDailyGoalCompleted: boolean;
+  lastLoginDate: string;
+  createdAt: Date;
 }
 
 function App() {
@@ -62,23 +66,17 @@ function App() {
   return (
     <Router>
       <div className="App">
-        {user && (
-          <nav>
-            {/* Add your navigation menu items here */}
-            <button onClick={handleLogout}>Logout</button>
-          </nav>
-        )}
         <Routes>
           <Route 
             path="/" 
             element={
-              user ? <Dashboard userData={userData} /> : <Navigate to="/login" replace />
+              user ? <Dashboard userData={userData} onLogout={handleLogout} /> : <Navigate to="/login" replace />
             } 
           />
           <Route 
             path="/profile" 
             element={
-              user ? <ProfilePage userData={userData} /> : <Navigate to="/login" replace />
+              user ? <ProfilePage userData={userData} onLogout={handleLogout} /> : <Navigate to="/login" replace />
             } 
           />
           <Route 

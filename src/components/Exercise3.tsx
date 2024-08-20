@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Confetti from 'react-confetti';
 import { useNavigate } from 'react-router-dom';
 import { auth, updateUserProgress, getUserData } from '../firebase';
+import ChatbotModal from './ChatbotModal';
 
 interface WordsBreathingExerciseProps {
   openChatModal: () => void;
@@ -21,7 +22,8 @@ const WordsBreathingExercise: React.FC<WordsBreathingExerciseProps> = ({ openCha
   const [circleSize, setCircleSize] = useState(50);
   const [xp, setXp] = useState(0);
   const [level, setLevel] = useState(1);
-  
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+
   const [inhaleTime, setInhaleTime] = useState(0);
   const [exhaleTime, setExhaleTime] = useState(0);
   const breathingTimerRef = useRef<number | null>(null);
@@ -154,11 +156,17 @@ const WordsBreathingExercise: React.FC<WordsBreathingExerciseProps> = ({ openCha
   const handleFeelingClick = (selectedFeeling: string) => {
     setFeeling(selectedFeeling);
     if (selectedFeeling === 'I Want to Ask a Question') {
-      openChatModal();
+      setIsChatModalOpen(true);
     } else {
       handleExerciseComplete();
     }
   };
+
+  const handleChatModalClose = () => {
+    setIsChatModalOpen(false);
+    handleExerciseComplete();
+  };
+
 
   const handleExerciseComplete = async () => {
     const user = auth.currentUser;
@@ -202,6 +210,21 @@ const WordsBreathingExercise: React.FC<WordsBreathingExerciseProps> = ({ openCha
     setShowConfetti(true);
   };
 
+  useEffect(() => {
+    let confettiTimer: NodeJS.Timeout;
+    if (showConfetti) {
+      confettiTimer = setTimeout(() => {
+        setShowConfetti(false);
+      }, 2500); // 1.5 seconds
+    }
+    return () => {
+      if (confettiTimer) {
+        clearTimeout(confettiTimer);
+      }
+    };
+  }, [showConfetti]);
+
+
   const handleReturnHome = () => {
     navigate('/');
   };
@@ -244,46 +267,70 @@ const storeExerciseData = useCallback(async () => {
   return (
     <div className="h-screen bg-gray-900 text-white flex flex-col items-center justify-center relative">
       <AnimatePresence>
-        {stage === 'intro' && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="text-center max-w-2xl mx-auto"
-          >
-            <h2 className="text-3xl font-bold mb-6 text-blue-400">Peripheral Vision Training</h2>
-            <div className="mb-6 bg-gray-800 p-6 rounded-lg">
-              <h3 className="text-2xl font-bold mb-3 text-blue-300">Goal</h3>
-              <ul className="list-disc list-inside text-gray-300">
-                <li>Train peripheral vision</li>
-                <li>Maintain breathing rhythm while reading words</li>
-              </ul>
-            </div>
-            <div className="mb-6 bg-gray-800 p-6 rounded-lg">
-              <h3 className="text-2xl font-bold mb-3 text-blue-300">Instructions</h3>
-              <ul className="list-disc list-inside text-gray-300">
-                <li>Two words will appear on the sides of the screen</li>
-                <li>The words will change every 5 seconds</li>
-                <li>Maintain the breathing rhythm from Exercise 1</li>
-                <li>Hold the "Inhaling" button while inhaling</li>
-                <li>Hold the "Exhaling" button while exhaling</li>
-                <li>Try to read both words using your peripheral vision</li>
-              </ul>
-            </div>
-            <div className="mt-6 space-x-4">
-              <button onClick={() => handleDurationSelect(1)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-                Beginner (1 minute)
-              </button>
-              <button onClick={() => handleDurationSelect(3)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-                Intermediate (3 minutes)
-              </button>
-              <button onClick={() => handleDurationSelect(5)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-                Pro (5 minutes)
-              </button>
-            </div>
-          </motion.div>
-        )}
+      {stage === 'intro' && (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="bg-gray-800 text-white p-8 rounded-lg shadow-lg max-w-2xl w-full mx-auto relative"
+  >
+    <button 
+      onClick={() => navigate('/')} 
+      className="absolute top-4 right-4 text-gray-400 hover:text-white"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
 
+    <h2 className="text-3xl font-bold mb-6 text-center text-blue-400">Peripheral Vision Training</h2>
+
+    <div className="mb-6 aspect-w-16 aspect-h-9">
+      <video 
+        className="w-full h-full object-cover rounded-lg"
+        src="/exercise1.mp4"
+        controls
+      >
+        Your browser does not support the video tag.
+      </video>
+    </div>
+
+    <div className="text-left mb-6">
+      <h3 className="text-2xl font-bold mb-3 text-blue-300">Goal</h3>
+      <ul className="list-disc list-inside text-gray-300 ml-4">
+        <li>Train peripheral vision</li>
+        <li>Maintain breathing rhythm while reading words</li>
+      </ul>
+    </div>
+
+    <div className="text-left mb-6">
+      <h3 className="text-2xl font-bold mb-3 text-blue-300">Instructions</h3>
+      <ul className="list-disc list-inside text-gray-300 ml-4">
+        <li>Two words will appear on the sides of the screen</li>
+        <li>The words will change every 5 seconds</li>
+        <li>Maintain the breathing rhythm from Exercise 1</li>
+        <li>Press the center circle while inhaling</li>
+        <li>Release while holding your breath</li>
+        <li>Press the center circle while exhaling</li>
+        <li>Try to read both words using your peripheral vision</li>
+      </ul>
+    </div>
+
+    <div className="text-left mb-6">
+      <h3 className="text-2xl font-bold mb-3 text-blue-300">Completion Criteria</h3>
+      <ul className="list-disc list-inside text-gray-300 ml-4">
+        <li>Repeatedly do the exercise to 100% completion</li>
+      </ul>
+    </div>
+
+    <button
+      onClick={() => handleDurationSelect(1)}
+      className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded transition duration-300 ease-in-out"
+    >
+      Start!
+    </button>
+  </motion.div>
+)}
         {stage === 'exercise' && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -370,67 +417,68 @@ const storeExerciseData = useCallback(async () => {
             </motion.div>
           )}
   
-          {stage === 'feeling' && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center"
-            >
-              <h2 className="text-4xl font-bold mb-6 text-blue-400">How Are You Feeling?</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {['Shortness of Breath', 'Hyperventilating', 'Doing with Ease', 'I Want to Ask a Question'].map((feel) => (
-                  <button
-                    key={feel}
-                    onClick={() => handleFeelingClick(feel)}
-                    className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded transition duration-300 ease-in-out"
-                  >
-                    {feel}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          )}
+  {stage === 'feeling' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center"
+          >
+            <h2 className="text-4xl font-bold mb-6 text-blue-400">How Are You Feeling?</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {['Shortness of Breath', 'Hyperventilating', 'Doing with Ease', 'I Want to Ask a Question'].map((feel) => (
+                <button
+                  key={feel}
+                  onClick={() => handleFeelingClick(feel)}
+                  className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded transition duration-300 ease-in-out"
+                >
+                  {feel}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
   
-          {stage === 'completed' && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center"
-            >
-              <h2 className="text-4xl font-bold mb-6 text-blue-400">Congratulations on completing Exercise 3</h2>
-              <p className="text-xl mb-4 text-gray-300">
-                You've earned 100 XP!
-              </p>
-              <p className="text-xl mb-8 text-gray-300">
-                Current Level: {level} | XP: {xp % 200}/200
-              </p>
-              <p className="text-xl mb-8 text-gray-300">
-                You've successfully trained your peripheral vision while maintaining breathing control.
-                This skill will enhance your reading speed and comprehension.
-              </p>
-              <div className="mb-8">
-                <h3 className="text-2xl font-bold mb-4 text-blue-300">Your Improvement: Peripheral Vision</h3>
-                <p className="text-xl text-gray-300">10° → 30° field of view</p>
-                <div className="w-64 h-32 mx-auto">
-                  <svg viewBox="0 0 100 50">
-                    <polyline
-                      fill="none"
-                      stroke="#3B82F6"
-                      strokeWidth="2"
-                      points="0,50 50,20 100,10"
-                    />
-                  </svg>
-                </div>
-                <p className="text-gray-300 mt-4">Hint: practice this exercise to further expand your peripheral vision</p>
-              </div>
-              <button
-                onClick={handleReturnHome}
-                className="mt-4 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full transition duration-300 ease-in-out transform hover:scale-105"
-              >
-                Return Home
-              </button>
-            </motion.div>
-          )}
+{stage === 'completed' && (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="text-center max-w-2xl mx-auto px-4"
+  >
+    <h2 className="text-4xl font-bold mb-6 text-blue-400">Congratulations on completing the Breathing Exercise!</h2>
+    <p className="text-xl mb-2 text-gray-300">
+      You've earned 100 XP!
+    </p>
+    <p className="text-xl mb-8 text-gray-300">
+      Current Level: {level} | XP: {xp % 200}/200
+    </p>
+    <p className="text-lg mb-8 text-gray-300">
+      The rhythmic breathing you experienced will be used throughout the next few exercises. 
+      If you want a refresher on how to rhythmically breathe, you may come back to this exercise whenever you please.
+    </p>
+    <div className="mb-8">
+      <h3 className="text-2xl font-bold mb-4 text-blue-300">Your Improvement: Focus Time</h3>
+      <p className="text-xl text-gray-300">1 min → 15 min</p>
+      <div className="w-64 h-32 mx-auto">
+        <svg viewBox="0 0 100 50">
+          <polyline
+            fill="none"
+            stroke="#3B82F6"
+            strokeWidth="2"
+            points="0,50 50,40 100,10"
+          />
+        </svg>
+      </div>
+      <p className="text-gray-300 mt-4">Hint: do this exercise for longer to increase focus time</p>
+    </div>
+    <button
+      onClick={handleReturnHome}
+      className="mt-4 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full transition duration-300 ease-in-out"
+    >
+      Return Home
+    </button>
+  </motion.div>
+)}
         </AnimatePresence>
         {showConfetti && <Confetti />}
       </div>
